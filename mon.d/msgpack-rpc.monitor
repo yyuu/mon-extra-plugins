@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'msgpack/rpc'
+require 'optparse'
+require 'yaml'
+
+PROGRAM_NAME = File.basename($0)
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+
+options = {
+  :port => 9090,
+  :message => :ping,
+  :arguments => [],
+  :expected => 'ok',
+}
+
+parser = OptionParser.new { |op|
+  op.on('-a ARGUMENT', '--argument ARGUMENT') { |argument|
+    options[:arguments].push(YAML.load(argument))
+  }
+
+  op.on('-m MESSAGE', '--message MESSAGE') { |message|
+    options[:message] = message.to_sym()
+  }
+
+  op.on('-p PORT', '--port PORT', Integer) { |port|
+    if port < 1 or 65535 <= port
+      STDERR.puts("out of port range: #{port}")
+      STDERR.puts(op.help())
+      exit(EXIT_FAILURE)
+    end
+    options[:port] = port
+  }
+
+  op.on('-e EXPECTED', '--expected EXPECTED') { |expected|
+    options[:expected] = YAML.load(expected)
+  }
+}
+
+hosts = parser.parse(ARGV)
+results = hosts.map { |host|
+  begin
+    client = MessagePack::RPC::Client.new(host, options[:port])
+    returned = client.call(options[:message], *options[:arguments])
+    result = options[:expected] == returned
+    unless result
+      STDERR.puts("#{host}:#{options[:port]}\##{options[:message]}(#{options[:arguments].join(', ')}): " +
+                  "got #{returned}, expected #{options[:expected]}")
+    end
+    result
+  rescue StandardError => error
+    STDERR.puts("#{host}:#{options[:port]}\##{options[:message]}(#{options[:arguments].join(', ')}): " +
+                "#{error}")
+    false
+  end
+}
+
+exit(results.reduce(true) { |all, result| all && result } ? EXIT_SUCCESS : EXIT_FAILURE)
+
+# vim:set ft=ruby :

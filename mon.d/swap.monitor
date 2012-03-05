@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby1.8
+#
+# Author: Yamashita, Yuu <yamashita@geishatokyo.com>
+# 
+
+require 'facter'
+
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+
+def atoix(memorysize)
+  units = %w(B K M G T P E Z Y)
+  _memorysize = memorysize.sub(/(\d+(?:\.\d+)?)\s*([BKMGTPEZY])/i) {
+    $1.to_f * 1024**units.index($2[0,1].upcase)
+  }.to_i
+end
+
+fact = Facter.to_hash()
+$threshold = atoix(fact['memorysize']).to_f
+while arg = ARGV.shift
+  case arg
+  when '-t'
+    $threshold = atoix(ARGV.shift).to_f
+  else
+    # ignore unknown options
+  end
+end
+
+unless $threshold
+  raise("no swap usage limit specified")
+end
+
+swapsize = atoix(fact['swapsize']).to_f
+exit($threshold < swapsize ? EXIT_SUCCESS : EXIT_FAILURE)
+
+# vim:set ft=ruby :

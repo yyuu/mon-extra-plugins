@@ -1,0 +1,189 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import re
+import time
+import optparse
+import Queue
+import irclib
+
+class IRCNotifier(irclib.SimpleIRCClient):
+  def __init__(self, target):
+    irclib.SimpleIRCClient.__init__(self)
+    self.target = target
+    self.queue = Queue.Queue()
+
+  def on_welcome(self, connection, event):
+    if irclib.is_channel(self.target):
+      connection.join(self.target)
+    else:
+      self.send_it()
+
+  def on_join(self, connection, event):
+    self.send_it()
+
+  def on_disconnect(self, connection, event):
+    sys.exit(0)
+
+  def send_it(self):
+    while True:
+      try:
+        message = self.queue.get(False)
+      except Queue.Empty, error:
+        break
+#     self.connection.privmsg(self.target, message)
+      self.connection.notice(self.target, message)
+    self.connection.quit("Bye")
+
+  def puts(self, message):
+    self.queue.put(message)
+
+def main(args):
+  opt_parser = optparse.OptionParser("usage %prog [OPTIONS]", add_help_option=False)
+  opt_parser.add_option(
+      '-s',
+      type='string',
+      dest='service',
+      help='service',
+      default='',
+  )
+  opt_parser.add_option(
+      '-g',
+      type='string',
+      dest='group',
+      help='group',
+      default='',
+  )
+  opt_parser.add_option(
+      '-h',
+      type='string',
+      dest='hosts',
+      help='hosts',
+      default='',
+  )
+  opt_parser.add_option(
+      '-t',
+      type='int',
+      dest='tmnow',
+      help='tmnow',
+      default=0,
+  )
+  opt_parser.add_option(
+      '-u',
+      action='store_true',
+      dest='upalert',
+      help='(if upalert)',
+      default=False,
+  )
+  opt_parser.add_option( # not implemented
+      '-T',
+      action='store_true',
+      dest='trap',
+      help='(if trap)',
+      default=False,
+  )
+  opt_parser.add_option( # not implemented
+      '-O',
+      action='store_true',
+      dest='traptimeout',
+      help='(if traptimeout)',
+      default=False,
+  )
+  opt_parser.add_option( # not implemented
+      '-j',
+      action='store_true',
+      dest='join',
+      help='join the channel before doing PRIVMSG (some channel modes prevent PRIVMSG from user who hasn\'t joined the channel)',
+      default=False,
+  )
+  opt_parser.add_option(
+      '-c',
+      type='string',
+      dest='channel',
+      help='name of the channel (without leading #)',
+      default='mon',
+  )
+  opt_parser.add_option(
+      '-S',
+      type='string',
+      dest='server',
+      help='irc server',
+      default='localhost',
+  )
+  opt_parser.add_option(
+      '-U',
+      type='string',
+      dest='user',
+      help='user for irc server',
+  )
+  opt_parser.add_option(
+      '-n',
+      type='string',
+      dest='nick',
+      help='nick',
+      default='mon',
+  )
+  opt_parser.add_option(
+      '-d',
+      action='store_true',
+      dest='detail',
+      help='detail',
+      default=False,
+  )
+  opt_parser.add_option( # not implemented
+      '-N',
+      type='int',
+      dest='nick_tries',
+      help='nick_tries',
+      default=5,
+  )
+  opt_parser.add_option(
+      '-p',
+      type='int',
+      dest='port',
+      help='port',
+      default=6667,
+  )
+  opt_parser.add_option(
+      '-P',
+      type='string',
+      dest='password',
+      help='password',
+      default=None,
+  )
+  opt_parser.add_option(
+      '--help',
+      action='help',
+      help="show this help message and exit",
+  )
+
+  options, args = opt_parser.parse_args(args)
+  if options.user is None:
+    options.user = options.nick
+  if options.upalert:
+    alert = "UPALERT"
+  else:
+    alert = "ALERT"
+  summary = sys.stdin.readline()
+  if len(summary) == 0:
+    summary = "UNKNOWN"
+  details = sys.stdin.readlines()
+
+  irc = IRCNotifier('#%s' % options.channel)
+  try:
+    irc.connect(options.server, options.port, options.nick, options.password, options.user)
+  except irclib.ServerConnectionError, error:
+    print(error)
+    sys.exit(1)
+
+  irc.puts("%s %s (%s/%s): %s" % (alert, time.ctime(options.tmnow), options.service, options.group, summary))
+  if options.detail:
+    for detail in details:
+      irc.puts("%s (%s/%s): %s" % (message, time.ctime(options.tmnow), options.service, options.group, detail))
+  irc.start()
+
+if __name__ == "__main__":
+  main(sys.argv)
+
+# vim:set ft=python :

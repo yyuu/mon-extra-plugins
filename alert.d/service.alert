@@ -1,0 +1,25 @@
+#!/bin/sh
+
+while [ $# -gt 0 ]; do
+  case $1 in
+  -O) MON_OPT_O=1 ;;
+  -T) MON_OPT_T=1 ;;
+  -u) MON_OPT_u=1 ;;
+  -g) shift; MON_OPT_g="$1" ;;
+  -h) shift; MON_OPT_h="$1" ;;
+  -l) shift; MON_OPT_l="$1" ;;
+  -s) shift; MON_OPT_s="$1" ;;
+  -t) shift; MON_OPT_t="$1" ;;
+  *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -lt 2 ]; then
+  echo "$0: service name or action was not given" 1>&2
+  exit 1
+fi
+
+/usr/bin/sudo /usr/local/sbin/service "$@"
+
+# vim:set ft=sh :

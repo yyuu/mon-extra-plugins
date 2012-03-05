@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Author: Yamashita, Yuu <yamashita@geishatokyo.com>
+#
+
+CHECK="/etc/mk-heartbeat/check"
+MAX_DELAY=60
+
+while test $# -ge 1; do
+  case "$1" in
+  -c|--check)
+    shift
+    CHECK="${1:-$CHECK}"
+  ;;
+  -m|--max-delay)
+    shift
+    MAX_DELAY="${1:-$MAX_DELAY}"
+  ;;
+  *)
+    # nop
+  ;;
+  esac
+  shift
+done
+
+if ! test -x "$CHECK"; then
+  echo "$0: file not exists: $CHECK" 1>&2
+  exit 1
+fi
+
+CHECK_DIR=`dirname "$CHECK"`
+if ! test -x "$CHECK_DIR"; then
+  echo "$0: could not chdir: $CHECK_DIR" 1>&2
+  exit 1
+fi
+
+cd "$CHECK_DIR"
+
+STDOUT=`tempfile`
+sudo "$CHECK" | tee $STDOUT
+
+STATUS=$?
+if test $STATUS -eq 0; then
+  cat $STDOUT | awk -v PROGRAM_NAME="$0" -v MAX_DELAY="$MAX_DELAY" '
+    BEGIN {
+      status = 1;
+    }
+    $1 ~ "^-?[0-9]+$" {
+      if ( (delay=int($1)) < MAX_DELAY ) {
+        printf("%s: not exceeding the threshold: %d > %d\n", PROGRAM_NAME, MAX_DELAY, delay);
+        status = 0;
+      } else {
+        printf("%s: exceeding the threshold: %d <= %d\n", PROGRAM_NAME, MAX_DELAY, delay);
+      }
+    }
+    END {
+      exit(status);
+    }
+  '
+  STATUS=$?
+fi
+
+rm -f $STDOUT
+exit $STATUS
+
+# vim:set ft=sh :

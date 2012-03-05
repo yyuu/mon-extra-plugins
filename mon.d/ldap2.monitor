@@ -1,0 +1,40 @@
+#!/bin/sh
+
+LDAP_OPTS=''
+LDAP_FILTER=''
+LDAP_HOST=''
+
+while test $# -ge 1; do
+  case "$1" in
+  -D|--binddn)
+    shift
+    LDAP_OPTS="$LDAP_OPTS -D $1"
+  ;;
+  -Z|--starttls)
+    LDAP_OPTS="$LDAP_OPTS -Z"
+  ;;
+  -w|--bindpw)
+    shift
+    LDAP_OPTS="$LDAP_OPTS -w $1"
+  ;;
+  -x|--simple)
+    LDAP_OPTS="$LDAP_OPTS -x"
+  ;;
+  --filter)
+    shift
+    LDAP_OPTS="$LDAP_OPTS $1"
+  ;;
+  *)
+    if test -z $LDAP_FILTER; then
+      LDAP_FILTER=$1
+    else
+      LDAP_HOST=$1
+    fi
+  ;;
+  esac
+  shift
+done
+
+exec ldapsearch $LDAP_OPTS -h $LDAP_HOST $LDAP_FILTER
+
+# vim:set ft=sh :

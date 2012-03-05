@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby1.8
+#
+# Author: Yamashita, Yuu <yamashita@geishatokyo.com>
+# 
+
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+
+def loadavg()
+  ary = nil
+  File.open("/proc/loadavg") { |fp|
+    ary = fp.gets.split(/\s+/)
+  }
+  ary[0,3].map { |e| e.to_f }
+rescue StandardError, SystemCallError => e
+  raise("could not read /proc/loadavg")
+end
+
+while arg = ARGV.shift
+  case arg
+  when '-t' # acceptable load avarage limit
+    $threshold = ARGV.shift.to_f
+  else
+    # ignore unknown options
+  end
+end
+
+unless $threshold
+  raise("no load threshold was specified")
+end
+
+a = loadavg()
+n = a.reduce(:+) / a.size
+if n < $threshold
+  exit(EXIT_SUCCESS)
+else
+  STDERR.puts("load average limit exceeded (#{n})")
+  exit(EXIT_FAILURE)
+end
+
+# vim:set ft=ruby :

@@ -1,0 +1,95 @@
+#!/usr/bin/env ruby1.8
+#
+# Author: Yamashita, Yuu <yamashita@geishatokyo.com>
+# 
+
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+
+def escapeshellarg(str)
+  str = str.gsub("\\", "\\\\")
+  str = str.gsub("'", "\\'")
+  "'#{str}'"
+end
+
+def atoix(memorysize)
+  units = %w(B K M G T P E Z Y)
+  _memorysize = memorysize.sub(/(\d+(?:\.\d+)?)\s*([BKMGTPEZY])/i) {
+    $1.to_f * 1024**units.index($2[0,1].upcase)
+  }.to_i
+end
+
+def itoax(memorysize)
+  "#{memorysize/1024**2}MB"
+end
+
+def rss(pid)
+  rss = nil
+  File.open("/proc/#{pid}/status") { |fp|
+    fp.each { |line|
+      if /^\s*VmHWM\s*:\s*(\d+\s*[KMGTPEZY]?B)/i =~ line
+        rss = $1
+        break
+      end
+    }
+  }
+  atoix(rss)
+rescue StandardError, SystemCallError => e
+  raise("could not get resource size of pid #{pid}")
+end
+
+def pidof(svc)
+  svstat = `sudo service #{escapeshellarg(svc)} status`
+  if $?.success? and /^[^:]+: up \(pid (\d+)\) \d+ seconds/ =~ svstat
+    $1.to_i
+  else
+    raise("svstat #{escapeshellarg(svc)} failed")
+  end
+rescue StandardError, SystemCallError => e
+  raise("could not get pid of #{svc}")
+end
+
+def main(args=[])
+  while arg = args.shift
+    case arg
+    when '-d' # daemontools
+      $svc = args.shift
+    when '-p' # pid
+      $pid = args.shift
+    when '-s' # memory size
+      $memsiz = args.shift
+    else
+      # ignore unknown options
+    end
+  end
+
+  unless $pid
+    if $svc
+      $pid = pidof($svc)
+    else
+      raise("no service given")
+    end
+  end
+
+  unless $memsiz
+    raise("no process size limit specified")
+  end
+
+  limit = atoix($memsiz)
+  size = rss($pid)
+  if size < limit
+    exit(EXIT_SUCCESS)
+  else
+    STDERR.puts("memory size limit exceeded (pid #{$pid} uses #{itoax(size)})")
+    exit(EXIT_FAILURE)
+  end
+end
+
+begin
+  main(ARGV.dup)
+rescue StandardError => error
+  STDERR.puts("#{$0}: #{error.to_s}")
+  exit(0)
+end
+
+# vim:set ft=ruby :

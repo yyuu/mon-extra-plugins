@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Author: Yamashita, Yuu <yamashita@geishatokyo.com>
+#
+
+CHECK="/etc/mk-cheksum-table/check"
+MAX_DELAY=60
+IGNORE_CONNECT_ERRORS=0
+
+while test $# -ge 1; do
+  case "$1" in
+  -c|--check)
+    shift
+    CHECK="${1:-$CHECK}"
+  ;;
+  --ignore-connect-errors)
+    IGNORE_CONNECT_ERRORS=1
+  ;;
+  *)
+    # nop
+  ;;
+  esac
+  shift
+done
+
+if ! test -x "$CHECK"; then
+  echo "$0: file not exists: $CHECK" 1>&2
+  exit 1
+fi
+
+CHECK_DIR=`dirname "$CHECK"`
+if ! test -x "$CHECK_DIR"; then
+  echo "$0: could not chdir: $CHECK_DIR" 1>&2
+  exit 1
+fi
+
+cd "$CHECK_DIR"
+
+STDOUT=`tempfile`
+if test $IGNORE_CONNECT_ERRORS -eq 1; then
+  sudo "$CHECK" \
+    | sed -e '/^Cannot connect to/ { d }' \
+    | tee $STDOUT
+else
+  sudo "$CHECK" \
+    | tee $STDOUT
+fi
+
+STATUS=0
+if test $STATUS -ne 0; then
+  echo "$0: test command exits with failure: $CHECK" 1>&2
+  STATUS=1
+elif test -s $STDOUT; then
+  echo "$0: test command produces output: $CHECK" 1>&2
+  STATUS=1
+fi
+
+rm -f $STDOUT
+exit $STATUS
+
+# vim:set ft=sh :
