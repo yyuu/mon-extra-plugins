@@ -1,0 +1,81 @@
+#!/usr/bin/env python
+
+import glob
+import optparse
+import os
+import re
+import sys
+import time
+
+def main(args):
+  opt_parser = optparse.OptionParser("usage %prog [OPTIONS]", add_help_option=False)
+  opt_parser.add_option(
+      '-p',
+      '--pattern',
+      type='string',
+      dest='pattern',
+      help='pattern',
+      default='*',
+  )
+  opt_parser.add_option( # --equals
+      '--equals',
+      type='int',
+      dest='eq',
+  )
+  opt_parser.add_option( # --not-equals
+      '--not-equals',
+      type='int',
+      dest='ne',
+  )
+  opt_parser.add_option( # --less-than
+      '--less-than',
+      type='int',
+      dest='lt',
+  )
+  opt_parser.add_option( # --greater-than
+      '--greater-than',
+      type='int',
+      dest='gt',
+  )
+  opt_parser.add_option( # --less-or-equals
+      '--less-or-equals',
+      type='int',
+      dest='le',
+  )
+  opt_parser.add_option( # --greater-or-equals
+      '--greater-or-equals',
+      type='int',
+      dest='ge',
+  )
+
+  options, args = opt_parser.parse_args(args)
+  c = len(glob.glob(options.pattern))
+
+  if options.ne is not None: 
+    x = options.ne
+    ok = c != x
+  elif options.eq is not None:
+    x = options.eq
+    ok = c == x
+  elif options.le is not None:
+    x = options.le
+    ok = c <= x
+  elif options.ge is not None:
+    x = options.ge
+    ok = c >= x
+  elif options.lt is not None:
+    x = options.lt
+    ok = c < x
+  elif options.gt is not None:
+    x = options.gt
+    ok = c > x
+
+  if not ok:
+    print >> sys.stderr, "got %d for %d" % (c, x)
+
+  sys.exit(0 if ok else 1)
+
+if __name__ == "__main__":
+  main(sys.argv)
+
+# vim:set ft=python :
