@@ -1,0 +1,123 @@
+#!/usr/bin/env python
+
+import logging
+import optparse
+import os
+import re
+import sys
+import time
+import urllib
+import urllib2
+import urlparse
+
+try:
+  import json
+except ImportError:
+  import simplejson as json
+
+def main(args):
+  opt_parser = optparse.OptionParser("usage %prog [OPTIONS]", add_help_option=False)
+  opt_parser.add_option(
+      '--summary', '-S',
+      type='string',
+      dest='summary',
+      help='summary',
+  )
+  opt_parser.add_option(
+      '--debug',
+      action='store_true',
+      dest='debug',
+      help='debug',
+  )
+  opt_parser.add_option(
+      '--fluentd',
+      type='string',
+      dest='fluentd',
+      help='fluentd http input',
+      default='http://127.0.0.1:8888',
+  )
+  opt_parser.add_option(
+      '--group', '-g',
+      type='string',
+      dest='group',
+      help='group',
+      default='localhost',
+  )
+  opt_parser.add_option(
+      '--help',
+      action='help',
+      help="show this help message and exit",
+  )
+  opt_parser.add_option(
+      '--hosts', '-h',
+      type='string',
+      dest='hosts',
+      help='hosts',
+      default='localhost',
+  )
+  opt_parser.add_option(
+      '--until', '-l',
+      type='int',
+      dest='until',
+      help='secs until next alert',
+  )
+  opt_parser.add_option(
+      '--tag',
+      type='string',
+      dest='tag',
+      help='fluentd message tag',
+  )
+  opt_parser.add_option(
+      '--time', '-t',
+      type='int',
+      dest='tmnow',
+      help='tmnow',
+      default=int(time.time()),
+  )
+  opt_parser.add_option(
+      '--service', '-s',
+      type='string',
+      dest='service',
+      help='service',
+      default='unknown',
+  )
+  opt_parser.add_option(
+      '--upalert', '-u',
+      action='store_true',
+      dest='upalert',
+      help='(if upalert)',
+      default=False,
+  )
+
+  options, args = opt_parser.parse_args(args)
+  if options.summary is None:
+    options.summary = (sys.stdin.readline() or "UNKNOWN").strip()
+
+  body = {
+      'time': options.tmnow,
+      'json': json.dumps({
+          'group': options.group,
+          'hosts': [ host.strip() for host in options.hosts.split(",") ],
+          'service': options.service,
+          'summary': options.summary,
+      }),
+  }
+  if options.tag:
+    tag = options.tag
+  else:
+    ts = ["mon", 'upalert' if options.upalert else 'alert' ]
+    ts.extend(reversed(options.group.split(".")))
+    ts.append(options.service)
+    tag = ".".join(ts)
+  if options.debug:
+    tag = "debug." + tag
+  url = urlparse.urljoin(options.fluentd, tag)
+  try:
+    urllib2.urlopen(url, urllib.urlencode(body))
+  except Exception, error:
+    logging.error("error: %s: %s" % (url, error))
+
+if __name__ == "__main__":
+  main(sys.argv)
+
+# vim:set ft=python :
